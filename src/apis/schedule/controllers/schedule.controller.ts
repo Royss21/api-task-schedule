@@ -8,26 +8,35 @@ import {
   Delete,
   Query,
   Put,
+  Inject,
 } from '@nestjs/common';
-import { ScheduleService } from '../services/schedule.service';
-import { CreateScheduleDto, UpdateScheduleDto } from '../dto/input';
+import { IScheduleService, ScheduleService } from '../services';
+import { CreateScheduleDto } from '../dtos/input';
 
 @Controller('schedule')
 export class ScheduleController {
-  constructor(private readonly scheduleService: ScheduleService) {}
+  constructor(
+    @Inject(ScheduleService)
+    private readonly _scheduleService: IScheduleService,
+  ) {}
 
   @Post()
-  createCron(@Body('name') name: string) {
-    return this.scheduleService.createCron(name);
+  async create(@Body() schedule: CreateScheduleDto): Promise<boolean> {
+    return await this._scheduleService.create(schedule);
   }
 
-  @Put(':name/stop')
-  stopCron(@Param('name') name: string) {
-    return this.scheduleService.stopCron(name);
-  }
+  // @Post()
+  // createCron(@Body('name') name: string) {
+  //   return this._scheduleService.createCron(name);
+  // }
 
-  @Put(':name/start')
-  startCron(@Param('name') name: string) {
-    return this.scheduleService.startCron(name);
-  }
+  // @Put(':name/stop')
+  // stopCron(@Param('name') name: string) {
+  //   return this.scheduleService.stopCron(name);
+  // }
+
+  // @Put(':name/start')
+  // startCron(@Param('name') name: string) {
+  //   return this.scheduleService.startCron(name);
+  // }
 }
