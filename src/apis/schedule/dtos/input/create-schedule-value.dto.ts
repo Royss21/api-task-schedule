@@ -1,7 +1,5 @@
-import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
-  arrayMinSize,
   IsArray,
   IsEnum,
   IsString,
@@ -23,9 +21,7 @@ export class CreateScheduleValueDto {
   typeScheduleCode: TypeSchedule;
 
   @ValidateIf((val: CreateScheduleValueDto): boolean =>
-    [TypeSchedule.INTERVAL, TypeSchedule.INTERVAL_BETWEEN].includes(
-      val.typeScheduleCode,
-    ),
+    [TypeSchedule.INTERVAL].includes(val.typeScheduleCode),
   )
   @IsString()
   @IsEnum(TypeTime)
@@ -40,13 +36,6 @@ export class CreateScheduleValueDto {
   )
   @IsString()
   value?: string;
-
-  // @ValidateIf((val: CreateScheduleValueDto): boolean =>
-  //   [TypeSchedule.INTERVAL_BETWEEN].includes(val.typeScheduleCode),
-  // )
-  // @IsNumber()
-  // @IsOptional()
-  // intervalMinutes?: number;
 
   @ValidateIf((val: CreateScheduleValueDto): boolean =>
     [TypeSchedule.INTERVAL_BETWEEN].includes(val.typeScheduleCode),
@@ -75,6 +64,5 @@ export class CreateScheduleValueDto {
   @IsArray()
   @ArrayMinSize(1)
   @IsEnum(DaysOfWeek, { each: true })
-  // @Type(() => Number)
   daysOfWeek?: DaysOfWeek[];
 }

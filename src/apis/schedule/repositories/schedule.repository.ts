@@ -16,7 +16,26 @@ export class ScheduleRepository extends Repository<Schedule> {
   }
 
   async findAll(): Promise<Schedule[]> {
-    return await this._scheduleRepository.find();
+    return await this._scheduleRepository.find({
+      relations: ['scheduleValue'],
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+
+  async findOneById(id: string): Promise<Schedule> {
+    const schedule = await this._scheduleRepository.findOne({
+      relations: ['typeSchedule', 'scheduleValue'],
+      where: {
+        id,
+      },
+    });
+
+    if (!schedule)
+      throw new BadRequestException('No se ha encontrado el cronograma');
+
+    return schedule;
   }
 
   async existsByUrlEndpoint(urlEndpoint: string): Promise<void> {

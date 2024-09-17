@@ -11,7 +11,7 @@ import { ScheduleValue } from './schedule-value.entity';
 import { AuditEntity } from 'src/core/audit/audit-entity';
 
 @Entity('schedule', { schema: 'config' })
-export class Schedule extends AuditEntity{
+export class Schedule extends AuditEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -29,6 +29,12 @@ export class Schedule extends AuditEntity{
     nullable: false,
   })
   description: string;
+
+  @Column({
+    type: 'smallint',
+    default: 0,
+  })
+  isActive: boolean;
 
   @ManyToOne(
     (): typeof TypeSchedule => TypeSchedule,
