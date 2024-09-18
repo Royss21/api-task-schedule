@@ -49,7 +49,7 @@ export class Schedule extends AuditEntity {
     (): typeof ScheduleValue => ScheduleValue,
     (entity: ScheduleValue): Schedule => entity.schedule,
     {
-      cascade: true,
+      cascade: true
     },
   )
   scheduleValue: ScheduleValue;

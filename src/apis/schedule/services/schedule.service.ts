@@ -3,11 +3,19 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { regexHour } from 'src/common/constants';
 import { TypeSchedule, TypeTime } from 'src/common/enums';
-import { CreateScheduleDto } from '../dtos/input';
+import {
+  CreateScheduleDto,
+  SchedulePaginationDto,
+  UpdateScheduleDto,
+} from '../dtos/input';
 import { Schedule } from '../entities';
 import { ScheduleRepository, TypeScheduleRepository } from '../repositories';
 import { ScheduleValueRepository } from '../repositories/schedule-value.repository';
 import { IScheduleService } from './schedule.service.interface';
+import { CronJobDto, ScheduleCronJobDto } from '../dtos/output';
+import { PaginationOutDto } from 'src/core/dtos';
+import { DataSource } from 'typeorm';
+import { dbTransaction } from 'src/common/utils';
 
 @Injectable()
 export class ScheduleService implements IScheduleService {
@@ -17,6 +25,7 @@ export class ScheduleService implements IScheduleService {
     private readonly _scheduleValueRepository: ScheduleValueRepository,
     private readonly _typeScheduleRepository: TypeScheduleRepository,
     private readonly _schedulerRegistry: SchedulerRegistry,
+    private readonly _dataSource: DataSource,
   ) {}
 
   async create(createSchedule: CreateScheduleDto): Promise<string> {
@@ -71,31 +80,53 @@ export class ScheduleService implements IScheduleService {
     return scheduleSave.id;
   }
 
+  async delete(id: string): Promise<boolean> {
+    const cronJob = await this._getCronJob(id);
+    if (cronJob) this._schedulerRegistry.deleteCronJob(id);
+
+    dbTransaction(this._dataSource, async () => {
+      await this._scheduleValueRepository.softDelete({ scheduleId: id });
+      await this._scheduleRepository.softDelete({ id });
+      return true;
+    });
+
+    return true;
+  }
+
+  async update(id: string, updateSchedule: UpdateScheduleDto): Promise<boolean> {
+    console.log({ id });
+
+    return true;
+  }
+
   async findAll(): Promise<Schedule[]> {
     return this._scheduleRepository.findAll();
   }
 
-  async findOneById(id: string): Promise<any> {
+  async findPaginated(
+    paginationDto: SchedulePaginationDto,
+  ): Promise<PaginationOutDto<ScheduleCronJobDto>> {
+    const schedules =
+      await this._scheduleRepository.findPaginated(paginationDto);
+
+    const schedulesCronjob: ScheduleCronJobDto[] = [];
+
+    for (const schedule of schedules) {
+      const cronJob = await this._getCronJobMap(schedule.id);
+      schedulesCronjob.push({ schedule, cronJob });
+    }
+
+    return new PaginationOutDto<ScheduleCronJobDto>(schedulesCronjob);
+  }
+
+  async findOneById(id: string): Promise<ScheduleCronJobDto> {
     const schedule = await this._scheduleRepository.findOneById(id);
-    const cronJob = await this._getCronJob(schedule.id);
-    return {
-      schedule,
-      cronJob: {
-        running: cronJob?.running,
-        lastExecution: cronJob?.lastExecution,
-        runOnce: cronJob?.runOnce,
-        cronTime: cronJob?.cronTime,
-        nextDate: cronJob?.nextDate(),
-        lastDate: cronJob?.lastDate(),
-      },
-    };
+    const cronJob = await this._getCronJobMap(schedule.id);
+    return new ScheduleCronJobDto(schedule, cronJob);
   }
 
   async startSchedule(id: string): Promise<boolean> {
     const schedule = await this._scheduleRepository.findOneById(id);
-
-    if (schedule.isActive)
-      throw new BadRequestException(`El cronograma esta activo`);
 
     let cronJob = await this._getCronJob(schedule.id);
     if (!cronJob) cronJob = await this._createCron(schedule);
@@ -109,9 +140,6 @@ export class ScheduleService implements IScheduleService {
   async stopSchedule(id: string): Promise<boolean> {
     const schedule = await this._scheduleRepository.findOneById(id);
 
-    if (!schedule.isActive)
-      throw new BadRequestException(`El cronograma esta desactivado`);
-
     let cronJob = await this._getCronJob(schedule.id);
     cronJob?.stop();
     await this._scheduleRepository.save({ ...schedule, isActive: false });
@@ -119,8 +147,17 @@ export class ScheduleService implements IScheduleService {
     return true;
   }
 
+  async startBulkSchedule(): Promise<void> {
+    const schedules = await this._scheduleRepository.findAllActive();
+
+    for (const schedule of schedules) {
+      this.startSchedule(schedule.id);
+    }
+  }
+
   private async _createCron(schedule: Schedule) {
     const {
+      id,
       name,
       scheduleValue: {
         urlEndpoint,
@@ -139,9 +176,9 @@ export class ScheduleService implements IScheduleService {
         typeTime === TypeTime.SECONDS
           ? `*/${value} * * * * *`
           : typeTime === TypeTime.MINUTES
-            ? `*/${value} * * * *`
+            ? `0 */${value} * * * *`
             : typeTime === TypeTime.HOURS
-              ? `* */${value} * * *`
+              ? `0 */${value} * * *`
               : '* * * * *';
     } else if (typeScheduleCode === TypeSchedule.SPECIFIC_TIME) {
       const [hour, minute] = value.split(':');
@@ -152,11 +189,19 @@ export class ScheduleService implements IScheduleService {
       cron = `${value} ${startMinute}-${endMinute} ${startHour}-${endHour} * ${daysOfWeek}`;
     }
 
-    const cronJob = new CronJob(cron, (): void => {
-      this._logger.log(`${name}: ${urlEndpoint}`);
-    });
+    const cronJob = new CronJob(
+      cron,
+      (): void => {
+        this._logger.log(`${name}: ${urlEndpoint}`);
+      },
+      null,
+      null,
+      'UTC',
+      null,
+      false,
+    );
 
-    this._schedulerRegistry.addCronJob(name, cronJob);
+    this._schedulerRegistry.addCronJob(id, cronJob);
 
     return cronJob;
   }
@@ -196,5 +241,17 @@ export class ScheduleService implements IScheduleService {
         resolve(null);
       }
     });
+  }
+
+  private async _getCronJobMap(scheduleId: string): Promise<CronJobDto> {
+    const cronJob = await this._getCronJob(scheduleId);
+    return {
+      running: cronJob?.running,
+      lastExecution: cronJob?.lastExecution,
+      runOnce: cronJob?.runOnce,
+      cronTime: cronJob?.cronTime,
+      nextDate: cronJob?.nextDate(),
+      lastDate: cronJob?.lastDate(),
+    };
   }
 }

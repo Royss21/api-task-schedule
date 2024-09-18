@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Schedule } from '../entities';
+import { SchedulePaginationDto } from '../dtos/input';
 
 export class ScheduleRepository extends Repository<Schedule> {
   constructor(
@@ -20,6 +21,28 @@ export class ScheduleRepository extends Repository<Schedule> {
       relations: ['scheduleValue'],
       order: {
         createdAt: 'DESC',
+      }
+    });
+  }
+
+  async findPaginated(
+    paginationDto: SchedulePaginationDto,
+  ): Promise<Schedule[]> {
+    const { limit = 10, offset = 1, search } = paginationDto;
+    return await this._scheduleRepository.find({
+      relations: ['typeSchedule', 'scheduleValue'],
+      // order: {
+      //   createdAt: 'DESC',
+      // },
+      skip: offset > 0 ? (offset - 1) * limit : 0,
+      take: limit,
+    });
+  }
+
+  async findAllActive(): Promise<Schedule[]> {
+    return await this._scheduleRepository.find({
+      where: {
+        isActive: true,
       },
     });
   }

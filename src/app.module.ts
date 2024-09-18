@@ -4,6 +4,7 @@ import { ScheduleTaskModule } from './apis/schedule/schedule.module';
 import { AppController } from './app.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { envs } from './config';
+import { AppService } from './app.service';
 
 @Module({
   imports: [
@@ -22,6 +23,6 @@ import { envs } from './config';
     ScheduleTaskModule,
   ],
   controllers: [AppController],
-  providers: [],
+  providers: [AppService],
 })
 export class AppModule {}

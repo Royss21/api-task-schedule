@@ -7,5 +7,6 @@ import { RepositoriesModule } from 'src/shared/repositories/repositories.module'
   controllers: [ScheduleController],
   providers: [ScheduleService],
   imports: [RepositoriesModule],
+  exports: [ScheduleService],
 })
 export class ScheduleTaskModule {}
